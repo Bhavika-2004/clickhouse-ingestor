@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ClickHouse Ingestor</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #f9fafb;
+      padding: 20px;
+      color: #111827;
+    }
+    .section {
+      background: white;
+      padding: 20px;
+      margin-top: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    input, button {
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+      width: 300px;
+    }
+    button {
+      background-color: #2563eb;
+      color: white;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    button:hover {
+      background-color: #1d4ed8;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    th, td {
+      padding: 10px;
+      border: 1px solid #e5e7eb;
+    }
+    th {
+      background-color: #f3f4f6;
+    }
+  </style>
+</head>
+<body>
+  <h1>ClickHouse Ingestor</h1>
+
+  <div class="section">
+    <h3>1. Connect to ClickHouse</h3>
+    <input type="text" id="host" placeholder="Host" value="localhost">
+    <input type="number" id="port" placeholder="Port" value="8123">
+    <input type="text" id="db" placeholder="Database" value="default">
+    <input type="password" id="jwt" placeholder="JWT Password">
+  </div>
+
+  <div class="section">
+    <h3>2. Create a New Table</h3>
+    <input type="text" id="tableName" placeholder="Table Name">
+    <input type="text" id="columnDefs" placeholder="e.g., id Int32, name String">
+    <button onclick="createTable()">Create Table</button>
+    <div id="createTableMsg"></div>
+  </div>
+
+  <div class="section">
+    <h3>3. Upload CSV and Select Columns</h3>
+    <input type="file" id="csvFile" accept=".csv">
+    <button onclick="uploadCsv()">Upload CSV</button>
+    <div id="columnSelection"></div>
+    <button id="submitColumnsBtn" onclick="submitSelectedColumns()" style="display:none;">Submit Selected Columns</button>
+    <div id="uploadResult"></div>
+  </div>
+
+  <div class="section">
+    <h3>4. Preview Table Data</h3>
+    <input type="text" id="previewColumns" placeholder="Comma-separated columns">
+    <button onclick="viewTableData()">View Data</button>
+    <div id="dataPreview"></div>
+  </div>
+
+  <div class="section">
+    <!-- Export Section -->
+<div>
+  <h3>5. Export Table Data</h3>
+  <input type="text" id="exportTableName" placeholder="Enter table name (e.g., data)" />
+  <input type="text" id="exportColumns" placeholder="e.g. id,name,age" />
+  <button onclick="exportCsv()">Export as CSV</button>
+  <div id="exportResult" style="margin-top: 10px; color: red;"></div>
+</div>
+
+  </div>
+
+  <script>
+    let uploadedFile;
+
+    async function createTable() {
+      const res = await fetch("/api/create-table", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clickhouseHost: document.getElementById("host").value,
+          clickhousePort: document.getElementById("port").value,
+          clickhouseDb: document.getElementById("db").value,
+          jwt: document.getElementById("jwt").value,
+          tableName: document.getElementById("tableName").value,
+          columns: document.getElementById("columnDefs").value
+        })
+      });
+      const result = await res.json();
+      document.getElementById("createTableMsg").innerText = result.message || result.error;
+    }
+
+    async function uploadCsv() {
+      const fileInput = document.getElementById("csvFile");
+      uploadedFile = fileInput.files[0];
+      const formData = new FormData();
+      formData.append("file", uploadedFile);
+      const res = await fetch("/api/upload-csv", { method: "POST", body: formData });
+      const columns = await res.json();
+      const container = document.getElementById("columnSelection");
+      container.innerHTML = '<h4>Select Columns:</h4>';
+      columns.forEach(col => {
+        container.innerHTML += `<label><input type='checkbox' name='col' value='${col}' checked> ${col}</label><br>`;
+      });
+      document.getElementById("submitColumnsBtn").style.display = "inline-block";
+    }
+
+    async function submitSelectedColumns() {
+      const selected = Array.from(document.querySelectorAll("input[name='col']:checked"))
+        .map(cb => cb.value);
+      const formData = new FormData();
+      formData.append("file", uploadedFile);
+      formData.append("columns", JSON.stringify(selected));
+      formData.append("clickhouseHost", document.getElementById("host").value);
+      formData.append("clickhousePort", document.getElementById("port").value);
+      formData.append("clickhouseDb", document.getElementById("db").value);
+      formData.append("jwt", document.getElementById("jwt").value);
+      formData.append("tableName", document.getElementById("tableName").value);
+
+      const res = await fetch("/api/submit-columns", { method: "POST", body: formData });
+      const result = await res.json();
+      document.getElementById("uploadResult").innerText = result.message || result.error;
+    }
+
+    async function viewTableData() {
+      const query = new URLSearchParams({
+        clickhouseHost: document.getElementById("host").value,
+        clickhousePort: document.getElementById("port").value,
+        clickhouseDb: document.getElementById("db").value,
+        jwt: document.getElementById("jwt").value,
+        table: document.getElementById("tableName").value,
+        columns: document.getElementById("previewColumns").value
+      });
+      const res = await fetch("/api/view-data?" + query);
+      const data = await res.json();
+      const container = document.getElementById("dataPreview");
+      if (!data.length) return container.innerHTML = "<p>No data found.</p>";
+
+      let html = "<table><tr>";
+      Object.keys(data[0]).forEach(col => html += `<th>${col}</th>`);
+      html += "</tr>";
+      data.forEach(row => {
+        html += "<tr>";
+        Object.values(row).forEach(val => html += `<td>${val}</td>`);
+        html += "</tr>";
+      });
+      html += "</table>";
+      container.innerHTML = html;
+    }
+
+    async function exportCsv() {
+  const tableName = document.getElementById("exportTableName").value.trim();
+  const exportColumnsInput = document.getElementById("exportColumns").value.trim();
+  const exportResultContainer = document.getElementById("exportResult");
+
+  if (!tableName) {
+    exportResultContainer.innerText = "Please enter a valid table name.";
+    return;
+  }
+  if (!exportColumnsInput) {
+    exportResultContainer.innerText = "Please enter the columns to export.";
+    return;
+  }
+
+  const query = new URLSearchParams({
+    clickhouseHost: document.getElementById("host").value,
+    clickhousePort: document.getElementById("port").value,
+    clickhouseDb: document.getElementById("db").value,
+    jwt: document.getElementById("jwt").value,
+    table: tableName
+  });
+
+  const columns = exportColumnsInput.split(',').map(col => col.trim());
+  columns.forEach(col => query.append("columns", col));
+
+  try {
+    const res = await fetch("/api/export-csv?" + query.toString());
+    if (!res.ok) throw new Error("Export failed");
+
+    const text = await res.text();
+    const blob = new Blob([text], { type: "text/csv" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = tableName + "_export.csv";
+    link.click();
+
+    exportResultContainer.innerText = "Export successful!";
+  } catch (err) {
+    exportResultContainer.innerText = "Export failed: " + err.message;
+  }
+}
+
+// Ensure exportColumns input exists in the HTML:
+// <input type="text" id="exportColumns" placeholder="e.g., id,name,age">
+// <div id="exportResult"></div>
+
+
+  </script>
+</body>
+</html>
