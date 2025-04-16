@@ -1,0 +1,24 @@
+Throughout the development of the ClickHouse Ingestor project, I relied on carefully crafted prompts to clarify concepts, resolve errors, and guide design decisions. While I implemented the full solution independently, these prompts played a useful role in enhancing my understanding of Java, Spring Boot, ClickHouse integration, and client-side logic.
+
+Some key areas where prompts were used include:
+
+- Understanding how to structure REST API endpoints in Spring Boot.
+- Debugging HTTP method errors (e.g., “Method 'GET' not supported”) and resolving CSV file parsing and parameter handling issues.
+- Designing logic for ingesting selected columns from CSVs and inserting them into ClickHouse.
+- Implementing secure and validated export functionality using query parameters (e.g., handling multiple column parameters properly).
+- Dynamically building queries in the backend while protecting against syntax issues and malformed input.
+- Ensuring data sanitization while constructing INSERT and SELECT queries.
+- Improving UI interactions such as dynamic table preview, export feedback, and column selection.
+
+Examples of prompts used:
+
+- “Why am I getting ‘Method GET not supported’ in my Spring Boot endpoint?”
+- “How do I pass multiple column names in a GET request and map them in the controller?”
+- “How do I preview data from a ClickHouse table using a frontend input?”
+- “How to convert export response to CSV and trigger download from JavaScript?”
+- “Getting export failed: expected table error — how to fix ClickHouse query?”
+- “Can you help me cleanly format and validate a dynamic export query in Spring Boot?”
+
+The logic, implementation, and final working app were built and debugged through my own development process. These prompts served primarily as reference guidance to ensure correctness and improve the robustness of the application.
+
+This approach helped ensure that I understood the core functionality deeply while still having a way to quickly check the correctness of ideas or investigate bugs.
